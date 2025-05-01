@@ -1,0 +1,154 @@
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+// GPS
+#define GPS_RX_PIN 4
+#define GPS_TX_PIN 3
+
+SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
+TinyGPSPlus gps;
+
+#define trigPin1 A5 ////right
+#define echoPin1 A4
+#define irs A0
+#define m1 2
+#define m2 3
+#define buzzer A2
+
+long duration, distance, sensor1, sensor2;
+int temp = 0, i, ir = 0;
+boolean Serial_status = 0;
+int counter = 0;
+double latitude = 0.0, longitude = 0.0;
+
+void setup()
+{
+    Serial.begin(9600);  // baudrate bps
+    gpsSerial.begin(9600);
+
+    pinMode(trigPin1, OUTPUT);
+    pinMode(echoPin1, INPUT);
+    pinMode(buzzer, OUTPUT);
+    pinMode(m1, OUTPUT);
+    pinMode(m2, OUTPUT);
+
+    delay(5000);
+    digitalWrite(buzzer, HIGH);
+    delay(1000);
+    digitalWrite(buzzer, LOW);
+    delay(1000);
+}
+
+void loop()
+{
+    while (gpsSerial.available() > 0) {
+        gps.encode(gpsSerial.read());
+    }
+
+    if (gps.location.isUpdated()) {
+        latitude = gps.location.lat();
+        longitude = gps.location.lng();
+    }
+
+    ir = digitalRead(irs);
+    ultrasensor(trigPin1, echoPin1);
+    sensor1 = distance;
+    Serial.print("Distance: ");
+    Serial.println(sensor1);
+    Serial.print("Latitude: ");
+    Serial.println(latitude, 6);
+    Serial.print("Longitude: ");
+    Serial.println(longitude, 6);
+
+    if (ir == LOW)
+    {
+        digitalWrite(buzzer, HIGH);
+        digitalWrite(m1, LOW);
+        digitalWrite(m2, LOW);
+        tracking();
+    }
+    else if ((sensor1 < 15) && (sensor1 >= 2))
+    {
+        digitalWrite(buzzer, HIGH);
+        digitalWrite(m1, LOW);
+        digitalWrite(m2, LOW);
+        tracking1();
+    }
+    else
+    {
+        digitalWrite(buzzer, LOW);
+        digitalWrite(m1, HIGH);
+        digitalWrite(m2, HIGH);
+    }
+    delay(100);
+}
+
+void init_sms()
+{
+    Serial.println("AT+CMGF=1");
+    delay(400);
+    Serial.println("AT+CMGS=\"+917050489534\"");  // use your 10 digit cell no. here
+    delay(400);
+}
+
+void init_sms1()
+{
+    Serial.println("AT+CMGF=1");
+    delay(400);
+    Serial.println("AT+CMGS=\"+916203418882\"");  // use your 10 digit cell no. here
+    delay(400);
+}
+
+void send_data(String message)
+{
+    Serial.println(message);
+    delay(200);
+}
+
+void send_sms()
+{
+    Serial.write(26);
+}
+
+void tracking()
+{
+    init_sms();
+    send_data("Track fault");
+    send_data("Latitude:");
+    send_data(String(latitude, 6));
+    send_data("Longitude:");
+    send_data(String(longitude, 6));
+    send_sms();
+    delay(5000);
+    init_sms1();
+    send_data("Track fault");
+    send_data("Latitude:");
+    send_data(String(latitude, 6));
+    send_data("Longitude:");
+    send_data(String(longitude, 6));
+    send_sms();
+    delay(5000);
+}
+
+void tracking1()
+{
+    init_sms();
+    send_data("Obstruction Ahead");
+    send_sms();
+    delay(5000);
+    init_sms1();
+    send_data("Obstruction Ahead");
+    send_sms();
+    delay(5000);
+}
+
+void ultrasensor(int trigPin, int echoPin)
+{
+    digitalWrite(trigPin, LOW);  // Ensure the trigPin is low
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);  // Send a 10 microsecond pulse
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);  // Turn off the pulse
+    duration = pulseIn(echoPin, HIGH);  // Measure the pulse duration
+    distance = (duration / 2) / 29.1;  // Calculate distance in cm
+}
